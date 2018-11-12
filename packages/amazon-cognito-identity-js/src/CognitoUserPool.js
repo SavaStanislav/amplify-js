@@ -116,6 +116,55 @@ export default class CognitoUserPool {
     });
   }
 
+  /**
+  * @typedef {object} Admin SignUpResult
+  * @property {CognitoUser} user New user.
+  * @property {bool} userConfirmed If the user is already confirmed.
+  */
+  /**
+   * method for signing up a user
+   * @param {string} username User's username.
+   * @param {string} password Plain-text initial password entered by user.
+   * @param {(AttributeArg[])=} userAttributes New user attributes.
+   * @param {(AttributeArg[])=} validationData Application metadata.
+   * @param {nodeCallback<SignUpResult>} callback Called on error or with the new user.
+   * @returns {void}
+   */
+  adminCreateUser(username, password, userAttributes, validationData, callback) {
+
+    const jsonReq = {
+      DesiredDeliveryMediums: ["email"],
+      ForceAliasCreation: false,
+      ClientId: this.clientId,
+      Username: username,
+      TemporaryPassword: password,
+      UserAttributes: userAttributes,
+      ValidationData: validationData,
+    };
+    if (this.getUserContextData(username)) {
+      jsonReq.UserContextData = this.getUserContextData(username);
+    }
+    this.client.request('AdminCreateUser', jsonReq, (err, data) => {
+      if (err) {
+        return callback(err, null);
+      }
+
+      const cognitoUser = {
+        Username: username,
+        Pool: this,
+        Storage: this.storage,
+      };
+
+      const returnData = {
+        user: new CognitoUser(cognitoUser),
+        userConfirmed: data.UserConfirmed,
+        userSub: data.UserSub,
+      };
+
+      return callback(null, returnData);
+    });
+  }
+
 
   /**
    * method for getting the current user of the application from the local storage
@@ -157,7 +206,7 @@ export default class CognitoUserPool {
 
     if (this.advancedSecurityDataCollectionFlag) {
       const advancedSecurityData = amazonCognitoAdvancedSecurityDataConst.getData(username,
-          this.userPoolId, this.clientId);
+        this.userPoolId, this.clientId);
       if (advancedSecurityData) {
         const userContextData = {
           EncodedData: advancedSecurityData,
